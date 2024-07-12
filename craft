@@ -1,0 +1,9 @@
+#!/usr/bin/env php
+<?php
+
+require __DIR__ . '/bootstrap.php';
+
+/** @var craft\console\Application $app */
+$app = require CRAFT_VENDOR_PATH . '/craftcms/cms/bootstrap/console.php';
+$exitCode = $app->run();
+exit($exitCode);

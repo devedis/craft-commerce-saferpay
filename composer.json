@@ -1,0 +1,54 @@
+{
+  "name": "devedis/craft-commerce-saferpay",
+  "description": "Craft Commerce Payment Gateway for Saferpay",
+  "type": "craft-plugin",
+  "version": "0.0.1",
+  "keywords": [
+    "craft",
+    "cms",
+    "craftcms",
+    "craft-plugin",
+    "commerce",
+    "craft-commerce",
+    "saferpay"
+  ],
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "devedis AG",
+      "homepage": "https://devedis.ch"
+    }
+  ],
+  "support": {
+    "email": "hallo@devedis.ch",
+    "issues": "https://github.com/devedis/craft-commerce-saferpay/issues",
+    "source": "https://github.com/devedis/craft-commerce-saferpay",
+    "docs": "https://github.com/devedis/craft-commerce-saferpay/blob/main/README.md"
+  },
+  "require": {
+    "craftcms/cms": "^5.0.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "craft\\commerce\\saferpay\\": "src/"
+    }
+  },
+  "extra": {
+    "name": "Craft Commerce Saferpay Gateway",
+    "handle": "commerce-saferpay",
+    "developer": "devedis AG",
+    "developerUrl": "https://devedis.ch",
+    "documentationUrl": "https://github.com/devedis/craft-commerce-saferpay",
+    "changelogUrl": "https://github.com/devedis/craft-commerce-saferpay/blob/main/CHANGELOG.md",
+    "components": {
+      "commerceSaferpayService": "craft\\commerce\\saferpay\\services\\CommerceSaferpayService"
+    },
+    "class": "craft\\commerce\\saferpay\\Plugin"
+  },
+  "config": {
+    "allow-plugins": {
+      "yiisoft/yii2-composer": true,
+      "craftcms/plugin-installer": true
+    }
+  }
+}
