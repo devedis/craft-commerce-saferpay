@@ -4,11 +4,39 @@ namespace craft\commerce\saferpay\services;
 
 use Craft;
 use craft\helpers\UrlHelper;
-use yii\base\Component;
 
-class SaferpayService extends Component
+class SaferpayService
 {
+
     private string $specVersion = '1.41';
+
+    private string $_apiUsername;
+    private string $_apiPassword;
+    private string $_customerId;
+    private string $_terminalId;
+    private bool $_useTestEnvironment;
+    private bool $_isStandalone;
+    private ?string $_returnUrl;
+
+
+    public function __construct(
+        string  $apiUsername,
+        string  $apiPassword,
+        string  $customerId,
+        string  $terminalId,
+        bool    $useTestEnvironment,
+        bool    $isStandalone,
+        ?string $returnUrl
+    )
+    {
+        $this->_apiUsername = $apiUsername;
+        $this->_apiPassword = $apiPassword;
+        $this->_customerId = $customerId;
+        $this->_terminalId = $terminalId;
+        $this->_useTestEnvironment = $useTestEnvironment;
+        $this->_isStandalone = $isStandalone;
+        $this->_returnUrl = $returnUrl;
+    }
 
     /**
      * @param $transaction
@@ -22,7 +50,7 @@ class SaferpayService extends Component
         $billingAddress = $order->getBillingAddress();
 
         $descTitle = "Flying Teachers";
-        if (isset($order->lineItems[0]->snapshot)){
+        if (isset($order->lineItems[0]->snapshot)) {
             $snapshot = $order->lineItems[0]->snapshot;
             $descTitle = $snapshot['title'];
         }
@@ -54,7 +82,7 @@ class SaferpayService extends Component
             'LastName' => $billingAddress['lastName'] ?? null,
             'Gender' => $gender,
             'Street' => $billingAddress['addressLine1'] ?? '',
-            'Street2' => $billingAddress['addressLine2'] ? $billingAddress['addressLine2']: 'None',
+            'Street2' => $billingAddress['addressLine2'] ? $billingAddress['addressLine2'] : 'None',
             'Zip' => $billingAddress['postalCode'] ?? null,
             'City' => $billingAddress['locality'] ?? null,
 //            'CountrySubdivisionCode' => $billingAddress['user_country'] ?? null,
@@ -62,21 +90,21 @@ class SaferpayService extends Component
             'Email' => $billingAddress->owner->email ?? null,
 //            'Phone' => $billingAddress['user_phone'] ?? null,
         ];
-        if  ($formattedDateOfBirth){
+        if ($formattedDateOfBirth) {
             $billingAddressArray['DateOfBirth'] = $formattedDateOfBirth;
         }
-        if  ($billingAddress['organization']){
+        if ($billingAddress['organization']) {
             $billingAddressArray['Company'] = $billingAddress['organization'];
         }
         $localeCode = $billingAddress['countryCode'] ?? Craft::$app->getSites()->currentSite->getLocale()->getLanguageID();
         $fields = [
             'RequestHeader' => [
                 'SpecVersion' => $this->specVersion,
-                'CustomerId' => getenv('SAFERPAY_CUSTOMER_ID'),
+                'CustomerId' => $this->_customerId,
                 'RequestId' => $transaction['hash'],
                 'RetryIndicator' => 0, // Should be unique for each new request. If a request is retried due to an error, use the same request id. In this case, the RetryIndicator should be increased instead, to indicate a subsequent attempt.
             ],
-            'TerminalId' => getenv('SAFERPAY_TERMINAL_ID'),
+            'TerminalId' => $this->_terminalId,
             //'PaymentMethods' => ["DIRECTDEBIT", "SOFORT", "EPS", "GIROPAY", "VISA", "MASTERCARD"],
             'Payment' => [
                 'Amount' => [
@@ -91,13 +119,13 @@ class SaferpayService extends Component
                 'BillingAddress' => $billingAddressArray
             ],
             'ReturnUrl' => [
-                'Url' => UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]),
+                'Url' => $this->_isStandalone ? UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]) : $this->_returnUrl,
             ],
         ];
         \Craft::info(
             json_encode(['POST' => $_POST, 'Posted info to SaferPay' => $fields, 'Type' => 'Default Pay']), 'commerce-saferpay'
         );
-        $url = getenv('SAFERPAY_API_URL') . 'Payment/v1/PaymentPage/Initialize';
+        $url = $this->getApiUrl() . 'Payment/v1/PaymentPage/Initialize';
         $curl = curl_init($url);
         curl_setopt($curl, CURLOPT_HEADER, false);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -106,7 +134,7 @@ class SaferpayService extends Component
         curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($fields));
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($curl, CURLOPT_USERPWD, getenv('SAFERPAY_USERNAME') . ":" . getenv('SAFERPAY_PASSWORD'));
+        curl_setopt($curl, CURLOPT_USERPWD, $this->_apiUsername . ":" . $this->_apiPassword);
 
         $response = curl_exec($curl);
         $body = json_decode($response, true);
@@ -129,8 +157,8 @@ class SaferpayService extends Component
      */
     public function paymentPageAssert($token): array
     {
-        $apiUrl = getenv('SAFERPAY_API_URL') . 'Payment/v1/PaymentPage/Assert';
-        $customerId = getenv('SAFERPAY_CUSTOMER_ID');;
+        $apiUrl = $this->getApiUrl() . 'Payment/v1/PaymentPage/Assert';
+        $customerId = $this->_customerId;
 
         $requestData = [
             'RequestHeader' => [
@@ -151,7 +179,7 @@ class SaferpayService extends Component
         curl_setopt($curl, CURLOPT_POST, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($curl, CURLOPT_USERPWD, getenv('SAFERPAY_USERNAME') . ":" . getenv('SAFERPAY_PASSWORD'));
+        curl_setopt($curl, CURLOPT_USERPWD, $this->_apiUsername . ":" . $this->_apiPassword);
         curl_setopt($curl, CURLOPT_POSTFIELDS, $jsonData);
 
         $response = curl_exec($curl);
@@ -178,7 +206,7 @@ class SaferpayService extends Component
         $requestData = [
             "RequestHeader" => [
                 "SpecVersion" => $this->specVersion,
-                "CustomerId" => getenv('SAFERPAY_CUSTOMER_ID'),
+                "CustomerId" => $this->_customerId,
                 "RequestId" => $transaction['hash'],
                 "RetryIndicator" => 0,
             ],
@@ -189,7 +217,7 @@ class SaferpayService extends Component
 
         $jsonData = json_encode($requestData);
 
-        $apiUrl = getenv('SAFERPAY_API_URL') . 'Payment/v1/Transaction/Capture';
+        $apiUrl = $this->getApiUrl() . 'Payment/v1/Transaction/Capture';
 
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, $apiUrl);
@@ -197,7 +225,7 @@ class SaferpayService extends Component
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, "POST");
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($curl, CURLOPT_USERPWD, getenv('SAFERPAY_USERNAME') . ":" . getenv('SAFERPAY_PASSWORD'));
+        curl_setopt($curl, CURLOPT_USERPWD, $this->_apiUsername . ":" . $this->_apiPassword);
         curl_setopt($curl, CURLOPT_HTTPHEADER, ["Content-type: application/json", "Accept: application/json; charset=utf-8"]);
         curl_setopt($curl, CURLOPT_POSTFIELDS, $jsonData);
 
@@ -222,7 +250,7 @@ class SaferpayService extends Component
         $requestData = [
             "RequestHeader" => [
                 "SpecVersion" => $this->specVersion,
-                "CustomerId" => getenv('SAFERPAY_CUSTOMER_ID'),
+                "CustomerId" => $this->_customerId,
                 "RequestId" => $transaction['hash'],
                 "RetryIndicator" => 0
             ],
@@ -233,7 +261,7 @@ class SaferpayService extends Component
 
         $jsonData = json_encode($requestData);
 
-        $apiUrl = getenv('SAFERPAY_API_URL') . 'Payment/v1/Transaction/Cancel';
+        $apiUrl = $this->getApiUrl() . 'Payment/v1/Transaction/Cancel';
 
         $curl = curl_init();
         curl_setopt($curl, CURLOPT_URL, $apiUrl);
@@ -242,7 +270,7 @@ class SaferpayService extends Component
         curl_setopt($curl, CURLOPT_POSTFIELDS, $jsonData);
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($curl, CURLOPT_USERPWD, getenv('SAFERPAY_USERNAME') . ":" . getenv('SAFERPAY_PASSWORD'));
+        curl_setopt($curl, CURLOPT_USERPWD, $this->_apiUsername . ":" . $this->_apiPassword);
         curl_setopt($curl, CURLOPT_HTTPHEADER, ["Content-type: application/json", "Accept: application/json; charset=utf-8"]);
         curl_setopt($curl, CURLOPT_POSTFIELDS, $jsonData);
 
@@ -255,5 +283,10 @@ class SaferpayService extends Component
         curl_close($curl);
 
         return json_decode($response, true);
+    }
+
+    private function getApiUrl()
+    {
+        return $this->_useTestEnvironment ? 'https://test.saferpay.com/api/' : 'https://www.saferpay.com/api/';
     }
 }

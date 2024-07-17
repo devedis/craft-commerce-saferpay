@@ -3,11 +3,12 @@
 namespace craft\commerce\saferpay;
 
 use Craft;
+use craft\base\Model;
 use craft\commerce\elements\Order;
 use craft\commerce\Plugin as Commerce;
 use craft\commerce\saferpay\behaviours\SaferpayBehaviour;
 use craft\commerce\saferpay\gateways\SaferpayGateway;
-use craft\commerce\saferpay\services\SaferpayService;
+use craft\commerce\saferpay\models\Settings;
 use craft\commerce\services\Gateways;
 use craft\events\DefineBehaviorsEvent;
 use craft\events\RegisterComponentTypesEvent;
@@ -25,10 +26,6 @@ class Plugin extends \craft\base\Plugin
     {
         parent::init();
         $this->_registerLogTarget();
-
-        $this->setComponents([
-            'saferpayService' => SaferpayService::class,
-        ]);
 
         Craft::$app->onInit(function () {
             $this->attachEventHandlers();
@@ -165,4 +162,10 @@ class Plugin extends \craft\base\Plugin
         $order->orderStatusId = $newStatus->id;
         return Craft::$app->elements->saveElement($order);
     }
+
+    protected function createSettingsModel(): ?Model
+    {
+        return new Settings();
+    }
+
 }

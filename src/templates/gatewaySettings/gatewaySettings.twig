@@ -1,0 +1,77 @@
+{% from "_includes/forms" import textField, autosuggestField, selectField, booleanMenuField %}
+
+<hr>
+<h2>{{ "Saferpay Configuration"|t('commerce-saferpay') }}</h2>
+
+{{ selectField({
+    label: "Integration"|t('commerce-saferpay'),
+    id: 'integration',
+    name: 'integration',
+    options: [
+        {label: 'Standalone', value: 'standalone'},
+        {label: 'Headless', value: 'headless'},
+    ],
+    value: gateway.integration,
+    instructions: "Standalone leitet direkt zur Commerce Complete Payment Action weiter. Headless leitet auf die definierte \"Return URL\" weiter."|t('commerce-saferpay'),
+}) }}
+
+{{ autosuggestField({
+    label: "Return URL"|t('commerce-saferpay'),
+    id: 'returnUrl',
+    class: 'ltr',
+    name: 'returnUrl',
+    suggestEnvVars: true,
+    value: gateway.getReturnUrl(false),
+    instructions: "The URL the customer will be redirected to after completing the payment."|t('commerce-saferpay'),
+}) }}
+
+{{ booleanMenuField({
+    label: "Use Test Environment?"|t('commerce-saferpay'),
+    id: 'useTestEnvironment',
+    class: 'ltr',
+    name: 'useTestEnvironment',
+    includeEnvVars: true,
+    value: gateway.getUseTestEnvironment(false),
+    errors: gateway.getErrors('useTestEnvironment'),
+}) }}
+
+{{ autosuggestField({
+    label: "Username"|t('app'),
+    id: 'apiUsername',
+    class: 'ltr',
+    name: 'apiUsername',
+    suggestEnvVars: true,
+    value: gateway.getApiUsername(false),
+    errors: gateway.getErrors('apiUsername')
+}) }}
+
+{{ autosuggestField({
+    label: "Password"|t('app'),
+    id: 'apiPassword',
+    class: 'ltr',
+    name: 'apiPassword',
+    suggestEnvVars: true,
+    value: gateway.getApiPassword(false),
+    errors: gateway.getErrors('apiPassword')
+}) }}
+
+{{ autosuggestField({
+    label: "Customer ID"|t('commerce-wallee'),
+    id: 'customerId',
+    class: 'ltr',
+    name: 'customerId',
+    suggestEnvVars: true,
+    value: gateway.getCustomerId(false),
+    errors: gateway.getErrors('customerId')
+}) }}
+
+{{ autosuggestField({
+    label: "Terminal ID"|t('commerce-wallee'),
+    id: 'terminalId',
+    class: 'ltr',
+    name: 'terminalId',
+    suggestEnvVars: true,
+    value: gateway.getTerminalId(false),
+    errors: gateway.getErrors('terminalId')
+}) }}
+

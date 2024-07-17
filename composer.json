@@ -42,9 +42,6 @@
     "developerUrl": "https://devedis.ch",
     "documentationUrl": "https://github.com/devedis/craft-commerce-saferpay",
     "changelogUrl": "https://github.com/devedis/craft-commerce-saferpay/blob/main/CHANGELOG.md",
-    "components": {
-      "saferpayService": "craft\\commerce\\saferpay\\services\\SaferpayService"
-    },
     "class": "craft\\commerce\\saferpay\\Plugin"
   },
   "config": {
