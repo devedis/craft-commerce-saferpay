@@ -52,8 +52,6 @@ class SaferpayGateway extends BaseGateway
     {
         try {
             $data = Plugin::getInstance()->saferpayService->paymentPageInitialize($transaction);
-            $_SESSION["Token"] = $data['Token'];
-
             return new CheckoutRedirectResponse(200, $data);
         } catch (ApiException $e) {
             return new CheckoutResponse(null, $e->getCode(), $e->getResponseBody(), 'error');
@@ -62,7 +60,7 @@ class SaferpayGateway extends BaseGateway
 
     public function completePurchase(Transaction $transaction): RequestResponseInterface
     {
-        $token = $_SESSION["Token"] ?? null;
+        $token = $transaction->reference;
 
         if (!$token) {
             return new CheckoutResponse(null, null, "No token set", 'error');

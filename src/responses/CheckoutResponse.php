@@ -10,7 +10,7 @@ class CheckoutResponse implements RequestResponseInterface
     private ?string $transactionId;
     private mixed $data;
     private string $status;
-    private string $code;
+    private ?string $code;
 
     public function __construct($transactionId, $code, $data, $status = 'redirect')
     {
