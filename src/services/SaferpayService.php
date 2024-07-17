@@ -81,7 +81,7 @@ class SaferpayService extends Component
             'Payment' => [
                 'Amount' => [
                     'Value' => (string)$transaction['paymentAmount'] * 100,
-                    'CurrencyCode' => $transaction['currency']
+                    'CurrencyCode' => $transaction['paymentCurrency']
                 ],
                 'OrderId' => $transaction['orderId'],
                 'Description' => $descTitle
