@@ -2,10 +2,9 @@
 
 namespace craft\commerce\saferpay\services;
 
+use Craft;
 use craft\helpers\UrlHelper;
 use yii\base\Component;
-use DateTime;
-use Craft;
 
 class SaferpayService extends Component
 {
@@ -256,145 +255,5 @@ class SaferpayService extends Component
         curl_close($curl);
 
         return json_decode($response, true);
-    }
-
-
-    // TODO not yet adapted
-    public function paymentPageInitializeLink($request): array
-    {
-        $entry = base64_decode($request['entryId']);
-        $entry = Craft::$app->getEntries()->getEntryById($entry);
-        if (!$entry){
-            return ['error' => 404];
-        }
-//        dd($request);
-        $course = $entry->courseOption->one();
-        $price = $entry->price?->getAmount();
-        if (!$price and $course){
-          $price = $course->getPrice() * 100;
-        }
-        $priceFor = $price;
-        $billingAddress = $request['shippingAddress'];
-        if ($course){
-            $descTitle = $request['email']." / ".
-                $billingAddress['fields']['user_firstName'] . " ".
-                $billingAddress['fields']['user_lastName'] .
-                " / ". $course->title ." / " . $priceFor / 100;
-        }else{
-            $descTitle = $request['email']." / ".
-                $billingAddress['fields']['user_firstName'] . " ".
-                $billingAddress['fields']['user_lastName'] .
-                " / " . $priceFor / 100;
-        }
-//        dd($billingAddress);
-        $gender = match ($billingAddress['fields']['user_salutation']) {
-            'Mr.' => 'MALE',
-            'Mrs.' => 'FEMALE',
-            default => null,
-        };
-
-        if (isset($billingAddress['fields']['user_birthday'])) {
-            $formattedDateOfBirth = $billingAddress['fields']['user_birthday'];
-        } else {
-            $formattedDateOfBirth = null;
-        }
-        $hash = hash('MD5',time().rand(0, 100));
-//        $baseUrl = Craft::$app->getSites()->getPrimarySite()->baseUrl;
-
-        $urlParams = [
-            'commerceTransactionHash' => $hash,
-            'email' => $request['email'],
-            'firstName' => $billingAddress['fields']['user_firstName'] ,
-            'lastName' => $billingAddress['fields']['user_lastName'],
-            'descTitle' => $descTitle,
-            'fields' => json_encode($request),
-        ];
-
-//        $successUrl = $baseUrl . "/actions/commerce-saferpay/pay-link/redirect?".http_build_query($urlParams);
-//        $failedUrl = $baseUrl . "/actions/commerce-saferpay/pay-link/failed-redirect?".http_build_query($urlParams);
-
-        $successUrl = UrlHelper::actionUrl("commerce-saferpay/pay-link/redirect", $urlParams);
-        $failedUrl = UrlHelper::actionUrl("commerce-saferpay/pay-link/failed-redirect", $urlParams);
-
-
-        $billingAddressArray = [
-            'FirstName' => $billingAddress['fields']['user_firstName'] ?? null,
-            'LastName' => $billingAddress['fields']['user_lastName'] ?? null,
-            'Gender' => $gender,
-            'Street' => $billingAddress['addressLine1'] ?? '',
-            'Street2' => $billingAddress['addressLine2'] ? $billingAddress['addressLine2']: 'None',
-            'Zip' => $billingAddress['postalCode'] ?? null,
-            'City' => $billingAddress['locality'] ?? null,
-            'CountrySubdivisionCode' => $billingAddress['fields']['user_country'] ?? null,
-            'Email' => $request['email'] ?? null,
-            'Phone' => $billingAddress['fields']['user_phone'] ?? null,
-        ];
-        if  ($formattedDateOfBirth){
-            $billingAddressArray['DateOfBirth'] = $formattedDateOfBirth;
-        }
-        if  ($billingAddress['organization']){
-            $billingAddressArray['Company'] = $billingAddress['organization'];
-        }
-        $fields = [
-            'RequestHeader' => [
-                'SpecVersion' => $this->specVersion,
-                'CustomerId' => getenv('SAFERPAY_CUSTOMER_ID'),
-                'RequestId' => $hash,
-                'RetryIndicator' => 0,
-            ],
-            'TerminalId' => getenv('SAFERPAY_TERMINAL_ID'),
-            //'PaymentMethods' => ["DIRECTDEBIT", "SOFORT", "EPS", "GIROPAY", "VISA", "MASTERCARD"],
-            'Payment' => [
-                'Amount' => [
-                    'Value' => (string)$price,
-                    'CurrencyCode' => 'CHF'
-                ],
-                'OrderId' => time(),
-                'Description' => "Payment Link: ". $descTitle
-            ],
-            'Payer'=> [
-                'LanguageCode' => $billingAddress['countryCode'],
-                'BillingAddress' => $billingAddressArray
-            ],
-            'ReturnUrls' => [
-                'Success' => $successUrl,
-                'Fail' => $failedUrl
-            ],
-        ];
-//        dd($fields);
-        \Craft::info(
-            json_encode(['POST' => $_POST, 'Posted info to SaferPay' => $fields, 'Type' => 'Payment Link']), 'commerce-saferpay'
-        );
-        $url = getenv('SAFERPAY_API_URL') . 'Payment/v1/PaymentPage/Initialize';
-        $curl = curl_init($url);
-        curl_setopt($curl, CURLOPT_HEADER, false);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_HTTPHEADER, ["Content-type: application/json", "Accept: application/json; charset=utf-8"]);
-        curl_setopt($curl, CURLOPT_POST, true);
-        curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($fields));
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
-        curl_setopt($curl, CURLOPT_USERPWD, getenv('SAFERPAY_USERNAME') . ":" . getenv('SAFERPAY_PASSWORD'));
-        $jsonResponse = curl_exec($curl);
-        $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        if ($status != 200) {
-            $body = json_decode(curl_multi_getcontent($curl), true);
-            $response = [
-                "url" => $url,
-                "status" => $status . " <|> " . curl_error($curl),
-                "body" => $body
-            ];
-        } else {
-            $body = json_decode($jsonResponse, true);
-            $response = [
-                "url" => $url,
-                "status" => $status,
-                "body" => $body
-            ];
-        }
-
-        curl_close($curl);
-
-        return $response;
     }
 }
