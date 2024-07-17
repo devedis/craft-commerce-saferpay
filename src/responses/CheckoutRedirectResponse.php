@@ -3,41 +3,32 @@
 namespace craft\commerce\saferpay\responses;
 
 use craft\commerce\base\RequestResponseInterface;
-use craft\commerce\saferpay\Plugin;
 
-class CheckoutResponse implements RequestResponseInterface
+class CheckoutRedirectResponse implements RequestResponseInterface
 {
-    private ?string $transactionId;
-    private mixed $data;
-    private string $status;
     private string $code;
+    private mixed $response;
 
-    public function __construct($transactionId, $code, $data, $status = 'redirect')
+
+    public function __construct($code, $response)
     {
-        $this->transactionId = $transactionId;
         $this->code = $code;
-        $this->data = $data;
-        $this->status = $status;
-    }
-
-    public function getStatus(): string
-    {
-        return $this->status;
+        $this->response = $response;
     }
 
     public function isSuccessful(): bool
     {
-        return $this->getStatus() === 'successful';
+        return false;
     }
 
     public function isProcessing(): bool
     {
-        return $this->getStatus() === 'processing';
+        return false;
     }
 
     public function isRedirect(): bool
     {
-        return false;
+        return true;
     }
 
     public function getRedirectMethod(): string
@@ -52,12 +43,12 @@ class CheckoutResponse implements RequestResponseInterface
 
     public function getRedirectUrl(): string
     {
-        return '';
+        return $this->response['RedirectUrl'];
     }
 
     public function getTransactionReference(): string
     {
-        return $this->transactionId;
+        return $this->response['Token'];
     }
 
     public function getCode(): string
@@ -67,12 +58,12 @@ class CheckoutResponse implements RequestResponseInterface
 
     public function getData(): mixed
     {
-        return $this->data;
+        return $this->response;
     }
 
     public function getMessage(): string
     {
-        return $this->data['ASSERT_RESPONSE']['ErrorName'] ?? $this->data['ASSERT_RESPONSE']['Transaction']['Status'] ?? $this->status;
+        return 'Redirect to external Payment Form';
     }
 
     public function redirect(): void

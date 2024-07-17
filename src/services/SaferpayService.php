@@ -15,6 +15,7 @@ class SaferpayService extends Component
      * @param $transaction
      * @return array
      * @throws \craft\errors\SiteNotFoundException
+     * @throws ApiException
      */
     public function paymentPageInitialize($transaction): array
     {
@@ -107,35 +108,27 @@ class SaferpayService extends Component
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($curl, CURLOPT_USERPWD, getenv('SAFERPAY_USERNAME') . ":" . getenv('SAFERPAY_PASSWORD'));
-        $jsonResponse = curl_exec($curl);
+
+        $response = curl_exec($curl);
+        $body = json_decode($response, true);
         $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-
-        if ($status != 200) {
-            $body = json_decode(curl_multi_getcontent($curl), true);
-            $response = [
-                "url" => $url,
-                "status" => $status . " <|> " . curl_error($curl),
-                "body" => $body
-            ];
-        } else {
-            $body = json_decode($jsonResponse, true);
-            $response = [
-                "url" => $url,
-                "status" => $status,
-                "body" => $body
-            ];
-        }
-
+        $error = curl_error($curl) ?? "API Error";
+        $errorNo = curl_errno($curl);
         curl_close($curl);
 
-        return $response;
+        if ($errorNo || $status !== 200) {
+            throw new ApiException($error, $status, $body);
+        }
+
+        return $body;
     }
 
     /**
      * @param $token
      * @return mixed
+     * @throws ApiException
      */
-    public function paymentPageAssert($token)
+    public function paymentPageAssert($token): array
     {
         $apiUrl = getenv('SAFERPAY_API_URL') . 'Payment/v1/PaymentPage/Assert';
         $customerId = getenv('SAFERPAY_CUSTOMER_ID');;
@@ -162,19 +155,18 @@ class SaferpayService extends Component
         curl_setopt($curl, CURLOPT_USERPWD, getenv('SAFERPAY_USERNAME') . ":" . getenv('SAFERPAY_PASSWORD'));
         curl_setopt($curl, CURLOPT_POSTFIELDS, $jsonData);
 
-        // Execute the cURL session
         $response = curl_exec($curl);
+        $body = json_decode($response, true);
+        $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $errorNo = curl_errno($curl);
+        $error = curl_error($curl) ?? "API Error";
+        curl_close($curl);
 
-        // Check for cURL errors
-        if (curl_errno($curl)) {
-            $error = curl_error($curl);
-
-            // TODO Handle the error - dd just means dump and die
-            dd($error);
+        if ($errorNo || $status !== 200) {
+            throw new ApiException($error, $status, $body);
         }
 
-        curl_close($curl);
-        return json_decode($response, true);
+        return $body;
     }
 
     /**

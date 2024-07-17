@@ -4,6 +4,8 @@ namespace craft\commerce\saferpay\gateways;
 
 use Craft;
 use craft\commerce\saferpay\Plugin;
+use craft\commerce\saferpay\responses\CheckoutRedirectResponse;
+use craft\commerce\saferpay\services\ApiException;
 use craft\web\Response as WebResponse;
 use craft\commerce\models\Transaction;
 use craft\commerce\models\PaymentSource;
@@ -15,8 +17,6 @@ use craft\commerce\saferpay\responses\CheckoutResponse;
 
 class SaferpayGateway extends BaseGateway
 {
-    private array $data = [];
-
     public static function displayName(): string
     {
         return 'Saferpay';
@@ -50,37 +50,58 @@ class SaferpayGateway extends BaseGateway
 
     public function purchase(Transaction $transaction, BasePaymentForm $form): RequestResponseInterface
     {
-        return new CheckoutResponse($transaction);
+        try {
+            $data = Plugin::getInstance()->saferpayService->paymentPageInitialize($transaction);
+            $_SESSION["Token"] = $data['Token'];
+
+            return new CheckoutRedirectResponse(200, $data);
+        } catch (ApiException $e) {
+            return new CheckoutResponse(null, $e->getCode(), $e->getResponseBody(), 'error');
+        }
     }
 
     public function completePurchase(Transaction $transaction): RequestResponseInterface
     {
-        $response = null;
         $token = $_SESSION["Token"] ?? null;
 
-        if ($token) {
+        if (!$token) {
+            return new CheckoutResponse(null, null, "No token set", 'error');
+        }
+
+        try {
             $response = Plugin::getInstance()->saferpayService->paymentPageAssert($token);
-        }
+            $transactionStatus = $response['Transaction']['Status']; //  'AUTHORIZED', 'CANCELED', 'CAPTURED' or 'PENDING'
 
-        if (!$response) {
-            return new CheckoutResponse($transaction, 'error');
-        }
+            if ($transactionStatus === 'AUTHORIZED') {
+                $captureResponse = Plugin::getInstance()->saferpayService->transactionCapture($transaction, $response['Transaction']['Id']);
+                $data = [
+                    'ASSERT_RESPONSE' => $response,
+                    'CAPTURE_RESPONSE' => $captureResponse,
+                ];
 
-        if (isset($response['ErrorName']) && $response['ErrorName'] === 'TRANSACTION_ABORTED') {
-            Plugin::getInstance()->saferpayService->transactionCancel($transaction, $response['TransactionId']);
-            return new CheckoutResponse($transaction, 'aborted');
-        }
+                return new CheckoutResponse($response['Transaction']['Id'], 200, $data, 'successful');
+            } else if ($transactionStatus === 'CANCELED') {
+                return new CheckoutResponse($response['Transaction']['Id'], 200, $response, 'error');
+            } else if ($transactionStatus === 'CAPTURED') {
+                return new CheckoutResponse($response['Transaction']['Id'], 200, $response, 'successful');
+            } else if ($transactionStatus === 'PENDING') {
+                return new CheckoutResponse($response['Transaction']['Id'], 200, $response, 'processing');
+            } else {
+                return new CheckoutResponse($response['Transaction']['Id'], 200, $response, 'error');
+            }
+        } catch (ApiException $e) {
+            $response = $e->getResponseBody();
 
-        if (!isset($response['Transaction']['Status'])) {
-            return new CheckoutResponse($transaction, 'error');
-        }
+            $aborted = $response['ErrorName'] === 'TRANSACTION_ABORTED';
 
-        if ($response['Transaction']['Status'] === 'AUTHORIZED') {
-            Plugin::getInstance()->saferpayService->transactionCapture($transaction, $response['Transaction']['Id']);
-            return new CheckoutResponse($transaction, 'successful');
-        } else {
-            Plugin::getInstance()->saferpayService->transactionCancel($transaction, $response['Transaction']['Id']);
-            return new CheckoutResponse($transaction, 'processing');
+            // TODO no cancel required
+//            $cancelResponse = Plugin::getInstance()->saferpayService->transactionCancel($transaction, $response['TransactionId']);
+            $data = [
+                'ASSERT_RESPONSE' => $response,
+//                'CANCEL_RESPONSE' => $cancelResponse,
+            ];
+
+            return new CheckoutResponse($response['TransactionId'], $e->getCode(), $data, $aborted ? 'aborted' : 'error');
         }
     }
 
