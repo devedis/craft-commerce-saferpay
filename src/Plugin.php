@@ -146,7 +146,7 @@ class Plugin extends \craft\base\Plugin
                 }
                 $user = \Craft::$app->getUsers()->getUserById($order->customer->id);
                 $res = \Craft::$app->getElements()->duplicateElement($order->shippingAddress, ['ownerId' => $order->customer->id]);
-                $customersService = \craft\commerce\Plugin::getInstance()->getCustomers();
+                $customersService = Commerce::getInstance()->getCustomers();
                 $customersService->savePrimaryShippingAddressId($user, $res->id);
                 $customersService->savePrimaryBillingAddressId($user, $res->id);
                 \Craft::$app->elements->saveElement($user);

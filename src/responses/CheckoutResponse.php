@@ -2,8 +2,8 @@
 
 namespace craft\commerce\saferpay\responses;
 
-use craft\commerce\saferpay\Plugin;
 use craft\commerce\base\RequestResponseInterface;
+use craft\commerce\saferpay\Plugin;
 
 class CheckoutResponse implements RequestResponseInterface
 {

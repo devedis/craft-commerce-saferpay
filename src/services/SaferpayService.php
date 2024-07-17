@@ -9,7 +9,7 @@ use Craft;
 
 class SaferpayService extends Component
 {
-    private string $specVersion = '1.7';
+    private string $specVersion = '1.41';
 
     /**
      * @param $transaction
@@ -74,7 +74,7 @@ class SaferpayService extends Component
                 'SpecVersion' => $this->specVersion,
                 'CustomerId' => getenv('SAFERPAY_CUSTOMER_ID'),
                 'RequestId' => $transaction['hash'],
-                'RetryIndicator' => 0,
+                'RetryIndicator' => 0, // Should be unique for each new request. If a request is retried due to an error, use the same request id. In this case, the RetryIndicator should be increased instead, to indicate a subsequent attempt.
             ],
             'TerminalId' => getenv('SAFERPAY_TERMINAL_ID'),
             //'PaymentMethods' => ["DIRECTDEBIT", "SOFORT", "EPS", "GIROPAY", "VISA", "MASTERCARD"],
@@ -90,12 +90,8 @@ class SaferpayService extends Component
                 'LanguageCode' => strtoupper($localeCode),
                 'BillingAddress' => $billingAddressArray
             ],
-            'ReturnUrls' => [
-//                'Success' => Craft::$app->getSites()->getPrimarySite()->baseUrl . "actions/commerce/payments/complete-payment?commerceTransactionHash=" . $transaction['hash'],
-                'Success' => UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]),
-//                'Fail' => Craft::$app->getSites()->getPrimarySite()->baseUrl . "checkout/payment"
-                'Fail' => UrlHelper::siteUrl('checkout/payment'),
-
+            'ReturnUrl' => [
+                'Url' => UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]),
             ],
         ];
         \Craft::info(
@@ -172,8 +168,9 @@ class SaferpayService extends Component
         // Check for cURL errors
         if (curl_errno($curl)) {
             $error = curl_error($curl);
+
+            // TODO Handle the error - dd just means dump and die
             dd($error);
-            // Handle the error
         }
 
         curl_close($curl);
@@ -324,8 +321,8 @@ class SaferpayService extends Component
 //        $successUrl = $baseUrl . "/actions/commerce-saferpay/pay-link/redirect?".http_build_query($urlParams);
 //        $failedUrl = $baseUrl . "/actions/commerce-saferpay/pay-link/failed-redirect?".http_build_query($urlParams);
 
-        $successUrl = UrlHelper::actionUrl("/actions/commerce-saferpay/pay-link/redirect", $urlParams);
-        $failedUrl = UrlHelper::actionUrl("/actions/commerce-saferpay/pay-link/failed-redirect", $urlParams);
+        $successUrl = UrlHelper::actionUrl("commerce-saferpay/pay-link/redirect", $urlParams);
+        $failedUrl = UrlHelper::actionUrl("commerce-saferpay/pay-link/failed-redirect", $urlParams);
 
 
         $billingAddressArray = [

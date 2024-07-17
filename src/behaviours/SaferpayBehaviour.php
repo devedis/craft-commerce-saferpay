@@ -7,7 +7,7 @@ use yii\base\Behavior;
 
 class SaferpayBehaviour extends Behavior
 {
-    public function safepay(): string
+    public function saferpay(): string
     {
         return Craft::$app->getView()->renderTemplate('commerce-saferpay/form.twig');
     }

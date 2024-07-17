@@ -29,17 +29,23 @@ class SaferpayGateway extends BaseGateway
 
     public function authorize(Transaction $transaction, BasePaymentForm $form): RequestResponseInterface
     {
-        return new CheckoutResponse($transaction);
+        Craft::info('Authorize', 'craft-commerce-saferpay');
+        dd("authorize");
+        // TODO implement authorize() method
     }
 
     public function capture(Transaction $transaction, string $reference): RequestResponseInterface
     {
-        return new CheckoutResponse($transaction);
+        Craft::info('Capture', 'craft-commerce-saferpay');
+        dd("capture");
+        // TODO implement capture() method
     }
 
     public function completeAuthorize(Transaction $transaction): RequestResponseInterface
     {
-        return new CheckoutResponse($transaction, 'successful');
+        Craft::info('CompleteAuthorize', 'craft-commerce-saferpay');
+        dd("completeAuthorize");
+        // TODO implement completeAuthorize() method
     }
 
     public function purchase(Transaction $transaction, BasePaymentForm $form): RequestResponseInterface
@@ -56,7 +62,16 @@ class SaferpayGateway extends BaseGateway
             $response = Plugin::getInstance()->saferpayService->paymentPageAssert($token);
         }
 
-        if (!$response || !isset($response['Transaction']['Status'])) {
+        if (!$response) {
+            return new CheckoutResponse($transaction, 'error');
+        }
+
+        if (isset($response['ErrorName']) && $response['ErrorName'] === 'TRANSACTION_ABORTED') {
+            Plugin::getInstance()->saferpayService->transactionCancel($transaction, $response['TransactionId']);
+            return new CheckoutResponse($transaction, 'aborted');
+        }
+
+        if (!isset($response['Transaction']['Status'])) {
             return new CheckoutResponse($transaction, 'error');
         }
 
@@ -71,11 +86,15 @@ class SaferpayGateway extends BaseGateway
 
     public function createPaymentSource(BasePaymentForm $sourceData, int $customerId): PaymentSource
     {
+        Craft::info('CreatePaymentSource', 'craft-commerce-saferpay');
+        dd("createPaymentSource");
         // TODO: Implement createPaymentSource() method.
     }
 
     public function deletePaymentSource(string $token): bool
     {
+        Craft::info('DeletePaymentSource', 'craft-commerce-saferpay');
+        dd("deletePaymentSource");
         // TODO: Implement deletePaymentSource() method.
     }
 
@@ -86,11 +105,15 @@ class SaferpayGateway extends BaseGateway
 
     public function refund(Transaction $transaction): RequestResponseInterface
     {
+        Craft::info('Refund', 'craft-commerce-saferpay');
+        dd("refund");
         // TODO: Implement refund() method.
     }
 
     public function processWebHook(): WebResponse
     {
+        Craft::info('ProcessWebHook', 'craft-commerce-saferpay');
+        dd("processWebHook");
         // TODO: Implement processWebHook() method.
     }
 
