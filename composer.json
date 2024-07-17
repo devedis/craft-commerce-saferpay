@@ -26,8 +26,9 @@
     "docs": "https://github.com/devedis/craft-commerce-saferpay/blob/main/README.md"
   },
   "require": {
+    "php": "^8.2",
     "craftcms/cms": "^5.0.0",
-    "craftcms/commerce": "5.0.12.2"
+    "craftcms/commerce": "^5.0.0"
   },
   "autoload": {
     "psr-4": {
@@ -42,7 +43,7 @@
     "documentationUrl": "https://github.com/devedis/craft-commerce-saferpay",
     "changelogUrl": "https://github.com/devedis/craft-commerce-saferpay/blob/main/CHANGELOG.md",
     "components": {
-      "commerceSaferpayService": "craft\\commerce\\saferpay\\services\\CommerceSaferpayService"
+      "saferpayService": "craft\\commerce\\saferpay\\services\\SaferpayService"
     },
     "class": "craft\\commerce\\saferpay\\Plugin"
   },
