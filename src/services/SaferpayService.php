@@ -97,6 +97,7 @@ class SaferpayService
             $billingAddressArray['Company'] = $billingAddress['organization'];
         }
         $localeCode = $billingAddress['countryCode'] ?? Craft::$app->getSites()->currentSite->getLocale()->getLanguageID();
+        $amount = $transaction['paymentAmount'] * 100;
         $fields = [
             'RequestHeader' => [
                 'SpecVersion' => $this->specVersion,
@@ -108,7 +109,7 @@ class SaferpayService
             //'PaymentMethods' => ["DIRECTDEBIT", "SOFORT", "EPS", "GIROPAY", "VISA", "MASTERCARD"],
             'Payment' => [
                 'Amount' => [
-                    'Value' => (string)$transaction['paymentAmount'] * 100,
+                    'Value' => "$amount",
                     'CurrencyCode' => $transaction['paymentCurrency']
                 ],
                 'OrderId' => $transaction['orderId'],

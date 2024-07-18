@@ -4,15 +4,12 @@ namespace craft\commerce\saferpay;
 
 use Craft;
 use craft\base\Model;
-use craft\commerce\saferpay\behaviours\SaferpayBehaviour;
 use craft\commerce\saferpay\gateways\SaferpayGateway;
 use craft\commerce\saferpay\models\Settings;
 use craft\commerce\services\Gateways;
-use craft\events\DefineBehaviorsEvent;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterTemplateRootsEvent;
 use craft\log\MonologTarget;
-use craft\web\twig\variables\CraftVariable;
 use craft\web\View;
 use Monolog\Formatter\LineFormatter;
 use Psr\Log\LogLevel;
@@ -57,16 +54,6 @@ class Plugin extends \craft\base\Plugin
                     $e->roots[$this->id] = $baseDir;
                 }
             });
-
-        Event::on(
-            CraftVariable::class,
-            CraftVariable::EVENT_DEFINE_BEHAVIORS,
-            function (DefineBehaviorsEvent $event) {
-                $event->sender->attachBehaviors([
-                    SaferpayBehaviour::class,
-                ]);
-            }
-        );
 
         Event::on(
             Gateways::class,

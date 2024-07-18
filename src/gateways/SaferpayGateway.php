@@ -47,7 +47,7 @@ class SaferpayGateway extends BaseGateway
 
     public function getPaymentFormHtml(array $params): ?string
     {
-        return Craft::$app->getView()->renderTemplate('commerce-saferpay/form.twig');
+        return Craft::$app->getView()->renderTemplate('commerce-saferpay/form');
     }
 
     public function authorize(Transaction $transaction, BasePaymentForm $form): RequestResponseInterface
@@ -77,6 +77,7 @@ class SaferpayGateway extends BaseGateway
             $data = $this->getSaferpayService()->paymentPageInitialize($transaction);
             return new CheckoutRedirectResponse(200, $data);
         } catch (ApiException $e) {
+            Craft::error($e->getMessage(), 'commerce-saferpay');
             return new CheckoutResponse(null, $e->getCode(), $e->getResponseBody(), 'error');
         }
     }
@@ -111,6 +112,8 @@ class SaferpayGateway extends BaseGateway
                 return new CheckoutResponse($response['Transaction']['Id'], 200, $response, 'error');
             }
         } catch (ApiException $e) {
+            Craft::error($e->getMessage(), 'commerce-saferpay');
+
             $response = $e->getResponseBody();
 
             $aborted = $response['ErrorName'] === 'TRANSACTION_ABORTED';

@@ -57,7 +57,7 @@ class CheckoutResponse implements RequestResponseInterface
 
     public function getTransactionReference(): string
     {
-        return $this->transactionId;
+        return $this->transactionId ?? "";
     }
 
     public function getCode(): string
