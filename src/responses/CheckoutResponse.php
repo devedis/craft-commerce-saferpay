@@ -3,7 +3,7 @@
 namespace craft\commerce\saferpay\responses;
 
 use craft\commerce\base\RequestResponseInterface;
-use craft\commerce\saferpay\Plugin;
+use craft\commerce\records\Transaction;
 
 class CheckoutResponse implements RequestResponseInterface
 {
@@ -12,7 +12,7 @@ class CheckoutResponse implements RequestResponseInterface
     private string $status;
     private ?string $code;
 
-    public function __construct($transactionId, $code, $data, $status = 'redirect')
+    public function __construct($transactionId, ?string $code, mixed $data, $status)
     {
         $this->transactionId = $transactionId;
         $this->code = $code;
@@ -27,12 +27,12 @@ class CheckoutResponse implements RequestResponseInterface
 
     public function isSuccessful(): bool
     {
-        return $this->getStatus() === 'successful';
+        return $this->getStatus() === Transaction::STATUS_SUCCESS;
     }
 
     public function isProcessing(): bool
     {
-        return $this->getStatus() === 'processing';
+        return $this->getStatus() === Transaction::STATUS_PROCESSING;
     }
 
     public function isRedirect(): bool

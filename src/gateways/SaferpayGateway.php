@@ -5,6 +5,8 @@ namespace craft\commerce\saferpay\gateways;
 use Craft;
 use craft\commerce\base\Gateway as BaseGateway;
 use craft\commerce\base\RequestResponseInterface;
+use craft\commerce\errors\TransactionException;
+use craft\commerce\events\TransactionEvent;
 use craft\commerce\models\payments\BasePaymentForm;
 use craft\commerce\models\payments\OffsitePaymentForm;
 use craft\commerce\models\PaymentSource;
@@ -15,8 +17,10 @@ use craft\commerce\saferpay\responses\CheckoutRedirectResponse;
 use craft\commerce\saferpay\responses\CheckoutResponse;
 use craft\commerce\saferpay\services\ApiException;
 use craft\commerce\saferpay\services\SaferpayService;
+use craft\commerce\services\Payments;
 use craft\helpers\App;
 use craft\web\Response as WebResponse;
+use Exception;
 
 class SaferpayGateway extends BaseGateway
 {
@@ -75,29 +79,86 @@ class SaferpayGateway extends BaseGateway
 
     public function purchase(Transaction $transaction, BasePaymentForm $form): RequestResponseInterface
     {
+        // TODO use correct URL
         $webhookUrl = $this->getWebhookUrl([
             'commerceTransactionId' => $transaction->id,
             'commerceTransactionHash' => $transaction->hash,
         ]);
+
+        $webhookUrl = "https://e902-85-195-237-242.ngrok-free.app/index.php?p=actions/commerce/webhooks/process-webhook&gateway=2&commerceTransactionHash={$transaction->hash}";
 
         try {
             $data = $this->getSaferpayService()->paymentPageInitialize($transaction, $webhookUrl);
             return new CheckoutRedirectResponse(200, $data);
         } catch (ApiException $e) {
             Craft::error($e->getMessage(), 'commerce-saferpay');
-            return new CheckoutResponse(null, $e->getCode(), $e->getResponseBody(), 'error');
+            return new CheckoutResponse(null, $e->getCode(), $e->getResponseBody(), TransactionRecord::STATUS_FAILED);
         }
     }
 
-    public function completePurchase(Transaction $transaction): RequestResponseInterface
+    /**
+     * @inheritdoc
+     */
+    public function completePurchase(Transaction $transaction, ?bool $isWebhook = false): RequestResponseInterface
     {
-        $token = $transaction->reference;
+        // TODO SIMULATE ASYNC
+//        if (!$isWebhook) {
+//            return new CheckoutResponse($transaction->reference, 200, [], TransactionRecord::STATUS_PROCESSING);
+//        }
 
-        if (!$token) {
-            return new CheckoutResponse(null, null, "No token set", 'error');
+        // TODO if canceled on payment page, and coming back, the webhook might already created a failed child transaction, so it creates two failed transactions
+
+        try {
+            $assert = $this->getSaferpayService()->paymentPageAssert($transaction->reference);
+            $transactionStatus = $assert['Transaction']['Status']; //  'AUTHORIZED', 'CANCELED', 'CAPTURED' or 'PENDING'
+
+            $reference = $assert['Transaction']['Id'];
+
+            if ($transactionStatus === 'AUTHORIZED') {
+                try {
+                    $captureResponse = $this->getSaferpayService()->transactionCapture($transaction, $assert['Transaction']['Id']);
+
+                    $data = [
+                        'ASSERT_RESPONSE' => $assert,
+                        'CAPTURE_RESPONSE' => $captureResponse,
+                    ];
+
+                    return new CheckoutResponse($reference, 200, $data, TransactionRecord::STATUS_SUCCESS);
+                } catch (ApiException $e) {
+                    Craft::error($e->getMessage(), 'commerce-saferpay');
+
+                    $data = [
+                        'ASSERT_RESPONSE' => $assert,
+                        'CAPTURE_RESPONSE' => $e->getResponseBody(),
+                    ];
+
+                    return new CheckoutResponse($reference, $e->getCode(), $data, TransactionRecord::STATUS_FAILED);
+                }
+            } else if ($transactionStatus === 'CANCELED') {
+                return new CheckoutResponse($reference, 200, $assert, TransactionRecord::STATUS_FAILED);
+            } else if ($transactionStatus === 'CAPTURED') {
+                return new CheckoutResponse($reference, 200, $assert, TransactionRecord::STATUS_SUCCESS);
+            } else if ($transactionStatus === 'PENDING') {
+                return new CheckoutResponse($reference, 200, $assert, TransactionRecord::STATUS_PROCESSING);
+            } else {
+                // TODO
+                return new CheckoutResponse($reference, 200, $assert, TransactionRecord::STATUS_FAILED);
+            }
+        } catch (ApiException $e) {
+            Craft::error($e->getMessage(), 'commerce-saferpay');
+
+            $errorBody = $e->getResponseBody();
+            $aborted = $errorBody['ErrorName'] === 'TRANSACTION_ABORTED';
+
+            // TODO no cancel required
+//            $cancelResponse = $this->>getSaferpayService()->transactionCancel($transaction, $response['TransactionId']);
+            $data = [
+                'ASSERT_RESPONSE' => $errorBody,
+//                'CANCEL_RESPONSE' => $cancelResponse,
+            ];
+
+            return new CheckoutResponse($errorBody['TransactionId'], $e->getCode(), $data, TransactionRecord::STATUS_FAILED);
         }
-
-        return new CheckoutResponse($token, 200, [], 'processing');
     }
 
     public function createPaymentSource(BasePaymentForm $sourceData, int $customerId): PaymentSource
@@ -142,86 +203,12 @@ class SaferpayGateway extends BaseGateway
             return $response;
         }
 
-        // If the transaction is already successful, we don't need to do anything.
-        $successfulPurchaseChildTransaction = TransactionRecord::find()->where([
-            'parentId' => $transaction->id,
-            'status' => TransactionRecord::STATUS_SUCCESS,
-            'type' => TransactionRecord::TYPE_PURCHASE,
-        ])->count();
+        $errorMessage = '';
+        $success = $this->completePayment($transaction, $errorMessage);
 
-        if ($successfulPurchaseChildTransaction) {
-            Craft::warning('Successful child transaction for “' . $transactionHash . '“ already exists.', 'commerce');
-
-            $response->data = 'ok';
-            return $response;
+        if (!$success) {
+            Craft::warning("Payment error $errorMessage", 'craft-commerce-saferpay');
         }
-
-        $childTransaction = Commerce::getInstance()->getTransactions()->createTransaction(null, $transaction);
-        $childTransaction->type = $transaction->type;
-
-        try {
-            $assert = $this->getSaferpayService()->paymentPageAssert($transaction->reference);
-            $transactionStatus = $assert['Transaction']['Status']; //  'AUTHORIZED', 'CANCELED', 'CAPTURED' or 'PENDING'
-
-            $childTransaction->code = 200;
-            $childTransaction->response = $assert;
-            $childTransaction->message = 'Webhook';
-            $childTransaction->reference = $assert['Transaction']['Id'];
-
-            if ($transactionStatus === 'AUTHORIZED') {
-                try {
-                    $captureResponse = $this->getSaferpayService()->transactionCapture($transaction, $assert['Transaction']['Id']);
-
-                    $data = [
-                        'ASSERT_RESPONSE' => $assert,
-                        'CAPTURE_RESPONSE' => $captureResponse,
-                    ];
-                    $childTransaction->response = $data;
-
-                    $childTransaction->status = TransactionRecord::STATUS_SUCCESS;
-                } catch (ApiException $e) {
-                    Craft::error($e->getMessage(), 'commerce-saferpay');
-
-                    $data = [
-                        'ASSERT_RESPONSE' => $assert,
-                        'CAPTURE_RESPONSE' => $e->getResponseBody(),
-                    ];
-
-                    $childTransaction->code = $e->getCode();
-                    $childTransaction->response = $data;
-                    $childTransaction->message = 'Capture failed';
-                    $childTransaction->status = TransactionRecord::STATUS_FAILED;
-                }
-            } else if ($transactionStatus === 'CANCELED') {
-                $childTransaction->status = TransactionRecord::STATUS_FAILED;
-            } else if ($transactionStatus === 'CAPTURED') {
-                $childTransaction->status = TransactionRecord::STATUS_SUCCESS;
-            } else if ($transactionStatus === 'PENDING') {
-                $childTransaction->status = TransactionRecord::STATUS_PROCESSING;
-            } else {
-                $childTransaction->status = TransactionRecord::STATUS_FAILED;
-            }
-        } catch (ApiException $e) {
-            Craft::error($e->getMessage(), 'commerce-saferpay');
-
-            $errorBody = $e->getResponseBody();
-            $aborted = $errorBody['ErrorName'] === 'TRANSACTION_ABORTED';
-
-            // TODO no cancel required
-//            $cancelResponse = $this->>getSaferpayService()->transactionCancel($transaction, $response['TransactionId']);
-            $data = [
-                'ASSERT_RESPONSE' => $errorBody,
-//                'CANCEL_RESPONSE' => $cancelResponse,
-            ];
-
-            $childTransaction->code = $e->getCode();
-            $childTransaction->response = $data;
-            $childTransaction->message = $aborted ? 'aborted' : '';
-            $childTransaction->reference = $errorBody['TransactionId'];
-            $childTransaction->status = TransactionRecord::STATUS_FAILED;
-        }
-
-        Commerce::getInstance()->getTransactions()->saveTransaction($childTransaction);
 
         $response->data = 'ok';
         return $response;
@@ -244,7 +231,7 @@ class SaferpayGateway extends BaseGateway
 
     public function supportsCompletePurchase(): bool
     {
-        return true;
+        return false;
     }
 
     public function supportsPaymentSources(): bool
@@ -371,5 +358,97 @@ class SaferpayGateway extends BaseGateway
     public function getTransactionHashFromWebhook(): ?string
     {
         return Craft::$app->getRequest()->getParam('commerceTransactionHash');
+    }
+
+    // Similar to vendor/craftcms/commerce/src/services/Payments.php::completePayment()
+    private function completePayment(Transaction $transaction, ?string &$errorMessage): bool {
+        $transactionHash = $transaction->hash;
+
+        $transactionLockName = 'saferpayCommerceTransaction:' . $transaction->hash;
+        $mutex = Craft::$app->getMutex();
+
+        if (!$mutex->acquire($transactionLockName, 15)) {
+            throw new Exception('Unable to acquire a lock for transaction: ' . $transaction->hash);
+        }
+
+        $isSuccessful = Commerce::getInstance()->getTransactions()->isTransactionSuccessful($transaction);
+
+        if ($isSuccessful) {
+            Craft::warning('Successful child transaction for “' . $transactionHash . '“ already exists.', 'commerce');
+            $transaction->order->updateOrderPaidInformation();
+            $mutex->release($transactionLockName);
+            return true;
+        }
+
+        // Ensure complete purchase is called.
+
+        // Load payment driver for the transaction we are trying to complete
+        $gateway = $transaction->getGateway();
+
+        switch ($transaction->type) {
+            case TransactionRecord::TYPE_PURCHASE:
+                $response = $gateway->completePurchase($transaction, true);
+                break;
+            // No TYPE_AUTHORIZE.
+            default:
+                $mutex->release($transactionLockName);
+                $errorMessage = 'Transaction type not supported.';
+                return false;
+        }
+
+        $childTransaction = Commerce::getInstance()->getTransactions()->createTransaction(null, $transaction);
+        $this->_updateTransaction($childTransaction, $response);
+
+        // Success can mean 2 things in this context.
+        // 1) The transaction completed successfully with the gateway, and is now marked as complete.
+        // 2) The result of the gateway request was successful but also got a redirect response. We now need to redirect if $redirect is not null.
+        $success = $response->isSuccessful() || $response->isProcessing();
+        $isParentTransactionRedirect = ($transaction->status === TransactionRecord::STATUS_REDIRECT);
+
+        if ($success) {
+            if ($transaction->status === TransactionRecord::STATUS_SUCCESS || ($isParentTransactionRedirect && $childTransaction->status == TransactionRecord::STATUS_SUCCESS)) {
+                $transaction->order->updateOrderPaidInformation();
+            }
+
+            if ($isParentTransactionRedirect && $childTransaction->status == TransactionRecord::STATUS_PROCESSING) {
+                $transaction->order->markAsComplete();
+            }
+        }
+
+        if ($this->hasEventHandlers(Payments::EVENT_AFTER_COMPLETE_PAYMENT)) {
+            $this->trigger(Payments::EVENT_AFTER_COMPLETE_PAYMENT, new TransactionEvent([
+                'transaction' => $transaction,
+            ]));
+        }
+
+        $mutex->release($transactionLockName);
+
+        if (!$success) {
+            $errorMessage = $response->getMessage();
+        }
+
+        return $success;
+    }
+
+    private function _updateTransaction(Transaction $transaction, RequestResponseInterface $response): void
+    {
+        if ($response->isSuccessful()) {
+            $transaction->status = TransactionRecord::STATUS_SUCCESS;
+        } elseif ($response->isProcessing()) {
+            $transaction->status = TransactionRecord::STATUS_PROCESSING;
+        } elseif ($response->isRedirect()) {
+            $transaction->status = TransactionRecord::STATUS_REDIRECT;
+        } else {
+            $transaction->status = TransactionRecord::STATUS_FAILED;
+        }
+
+        $transaction->response = $response->getData();
+        $transaction->code = $response->getCode();
+        $transaction->reference = $response->getTransactionReference();
+        $transaction->message = $response->getMessage();
+
+        if (!Commerce::getInstance()->getTransactions()->saveTransaction($transaction)) {
+            throw new TransactionException('Error saving transaction: ' . implode(', ', $transaction->errors));
+        }
     }
 }

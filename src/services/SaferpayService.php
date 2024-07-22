@@ -120,7 +120,8 @@ class SaferpayService
                 'BillingAddress' => $billingAddressArray
             ],
             'ReturnUrl' => [
-                'Url' => $this->_isStandalone ? UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]) : $this->_returnUrl,
+//                 'Url' => $this->_isStandalone ? UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]) : $this->_returnUrl,
+                'Url' => $this->_isStandalone ? UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]) : $transaction->order->returnUrl,
             ],
             'Notification' => [
                 'FailNotifyUrl' => $webhookUrl,
