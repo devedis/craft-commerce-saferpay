@@ -44,12 +44,12 @@ class SaferpayService
      * @throws \craft\errors\SiteNotFoundException
      * @throws ApiException
      */
-    public function paymentPageInitialize($transaction): array
+    public function paymentPageInitialize($transaction, $webhookUrl): array
     {
         $order = $transaction->getOrder();
         $billingAddress = $order->getBillingAddress();
 
-        $descTitle = "Flying Teachers";
+        $descTitle = Craft::$app->getSites()->currentSite->name;
         if (isset($order->lineItems[0]->snapshot)) {
             $snapshot = $order->lineItems[0]->snapshot;
             $descTitle = $snapshot['title'];
@@ -122,6 +122,10 @@ class SaferpayService
             'ReturnUrl' => [
                 'Url' => $this->_isStandalone ? UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]) : $this->_returnUrl,
             ],
+            'Notification' => [
+                'FailNotifyUrl' => $webhookUrl,
+                'SuccessNotifyUrl' => $webhookUrl,
+            ]
         ];
         \Craft::info(
             json_encode(['POST' => $_POST, 'Posted info to SaferPay' => $fields, 'Type' => 'Default Pay']), 'commerce-saferpay'
@@ -231,14 +235,17 @@ class SaferpayService
         curl_setopt($curl, CURLOPT_POSTFIELDS, $jsonData);
 
         $response = curl_exec($curl);
-
-        if (curl_errno($curl)) {
-            echo "cURL Error: " . curl_error($curl);
-        }
-
+        $body = json_decode($response, true);
+        $status = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $errorNo = curl_errno($curl);
+        $error = curl_error($curl) ?? "API Error";
         curl_close($curl);
 
-        return json_decode($response, true);
+        if ($errorNo || $status !== 200) {
+            throw new ApiException($error, $status, $body);
+        }
+
+        return $body;
     }
 
     /**
