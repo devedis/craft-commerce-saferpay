@@ -2,7 +2,7 @@
   "name": "devedis/craft-commerce-saferpay",
   "description": "Craft Commerce Payment Gateway for Saferpay",
   "type": "craft-plugin",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "keywords": [
     "craft",
     "cms",

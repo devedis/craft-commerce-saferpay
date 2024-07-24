@@ -26,14 +26,3 @@ services:
     volumes:
       - "/Users/andi/Documents/devedis/Craft/craft-commerce-saferpay:/dev/craft-commerce-saferpay"
 ```
-
-Add Saferpay environment variables:
-
-```
-# Saferpay
-SAFERPAY_API_URL="https://test.saferpay.com/api/"
-SAFERPAY_USERNAME=
-SAFERPAY_PASSWORD=
-SAFERPAY_TERMINAL_ID=
-SAFERPAY_CUSTOMER_ID=
-```
