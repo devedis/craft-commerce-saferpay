@@ -29,17 +29,17 @@ class SaferpayGateway extends BaseGateway
      */
     public string $integration = 'standalone';
 
-    private bool|string|null $_useTestEnvironment = null;
+    private bool|string|null $useTestEnvironment = null;
 
-    private ?string $_apiUsername = null;
+    private ?string $apiUsername = null;
 
-    private ?string $_apiPassword = null;
+    private ?string $apiPassword = null;
 
-    private ?string $_customerId = null;
+    private ?string $customerId = null;
 
-    private ?string $_terminalId = null;
+    private ?string $terminalId = null;
 
-    private ?SaferpayService $_saferpayService = null;
+    private ?SaferpayService $saferpayService = null;
 
     public static function displayName(): string
     {
@@ -264,58 +264,58 @@ class SaferpayGateway extends BaseGateway
 
     public function getUseTestEnvironment(bool $parse = true): bool|string|null
     {
-        return $parse ? App::parseEnv($this->_useTestEnvironment) : $this->_useTestEnvironment;
+        return $parse ? App::parseEnv($this->useTestEnvironment) : $this->useTestEnvironment;
     }
 
     public function getApiUsername(bool $parse = true): ?string
     {
-        return $parse ? App::parseEnv($this->_apiUsername) : $this->_apiUsername;
+        return $parse ? App::parseEnv($this->apiUsername) : $this->apiUsername;
     }
 
     public function getApiPassword(bool $parse = true): ?string
     {
-        return $parse ? App::parseEnv($this->_apiPassword) : $this->_apiPassword;
+        return $parse ? App::parseEnv($this->apiPassword) : $this->apiPassword;
     }
 
     public function getCustomerId(bool $parse = true): ?string
     {
-        return $parse ? App::parseEnv($this->_customerId) : $this->_customerId;
+        return $parse ? App::parseEnv($this->customerId) : $this->customerId;
     }
 
     public function getTerminalId(bool $parse = true): ?string
     {
-        return $parse ? App::parseEnv($this->_terminalId) : $this->_terminalId;
+        return $parse ? App::parseEnv($this->terminalId) : $this->terminalId;
     }
 
     public function setUseTestEnvironment(string|bool|null $useTestEnvironment): void
     {
-        $this->_useTestEnvironment = $useTestEnvironment;
+        $this->useTestEnvironment = $useTestEnvironment;
     }
 
     public function setApiUsername(?string $apiUsername): void
     {
-        $this->_apiUsername = $apiUsername;
+        $this->apiUsername = $apiUsername;
     }
 
     public function setApiPassword(?string $apiPassword): void
     {
-        $this->_apiPassword = $apiPassword;
+        $this->apiPassword = $apiPassword;
     }
 
     public function setCustomerId(?string $customerId): void
     {
-        $this->_customerId = $customerId;
+        $this->customerId = $customerId;
     }
 
     public function setTerminalId(?string $terminalId): void
     {
-        $this->_terminalId = $terminalId;
+        $this->terminalId = $terminalId;
     }
 
     public function getSaferpayService(): SaferpayService
     {
-        if ($this->_saferpayService == null) {
-            $this->_saferpayService = new SaferpayService(
+        if ($this->saferpayService == null) {
+            $this->saferpayService = new SaferpayService(
                 $this->getApiUsername(),
                 $this->getApiPassword(),
                 $this->getCustomerId(),
@@ -325,7 +325,7 @@ class SaferpayGateway extends BaseGateway
             );
         }
 
-        return $this->_saferpayService;
+        return $this->saferpayService;
     }
 
     public function getTransactionHashFromWebhook(): ?string
@@ -370,7 +370,7 @@ class SaferpayGateway extends BaseGateway
         }
 
         $childTransaction = Commerce::getInstance()->getTransactions()->createTransaction(null, $transaction);
-        $this->_updateTransaction($childTransaction, $response);
+        $this->updateTransaction($childTransaction, $response);
 
         // Success can mean 2 things in this context.
         // 1) The transaction completed successfully with the gateway, and is now marked as complete.
@@ -403,7 +403,7 @@ class SaferpayGateway extends BaseGateway
         return $success;
     }
 
-    private function _updateTransaction(Transaction $transaction, RequestResponseInterface $response): void
+    private function updateTransaction(Transaction $transaction, RequestResponseInterface $response): void
     {
         if ($response->isSuccessful()) {
             $transaction->status = TransactionRecord::STATUS_SUCCESS;

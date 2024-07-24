@@ -20,7 +20,7 @@ class Plugin extends \craft\base\Plugin
     public function init()
     {
         parent::init();
-        $this->_registerLogTarget();
+        $this->registerLogTarget();
 
         Craft::$app->onInit(function () {
             $this->attachEventHandlers();
@@ -69,7 +69,7 @@ class Plugin extends \craft\base\Plugin
         return new Settings();
     }
 
-    private function _registerLogTarget(): void
+    private function registerLogTarget(): void
     {
         Craft::getLogger()->dispatcher->targets[] = new MonologTarget([
             'name' => 'commerce-saferpay',
