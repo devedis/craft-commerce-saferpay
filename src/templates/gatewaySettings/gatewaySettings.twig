@@ -12,17 +12,7 @@
         {label: 'Headless', value: 'headless'},
     ],
     value: gateway.integration,
-    instructions: "Standalone leitet direkt zur Commerce Complete Payment Action weiter. Headless leitet auf die definierte \"Return URL\" weiter."|t('commerce-saferpay'),
-}) }}
-
-{{ autosuggestField({
-    label: "Return URL"|t('commerce-saferpay'),
-    id: 'returnUrl',
-    class: 'ltr',
-    name: 'returnUrl',
-    suggestEnvVars: true,
-    value: gateway.getReturnUrl(false),
-    instructions: "The URL the customer will be redirected to after completing the payment."|t('commerce-saferpay'),
+    instructions: "Standalone redirects directly to the Commerce Complete Payment Action. Headless redirects to the order return url."|t('commerce-saferpay'),
 }) }}
 
 {{ booleanMenuField({

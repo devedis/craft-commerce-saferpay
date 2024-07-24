@@ -16,7 +16,6 @@ class SaferpayService
     private string $_terminalId;
     private bool $_useTestEnvironment;
     private bool $_isStandalone;
-    private ?string $_returnUrl;
 
 
     public function __construct(
@@ -26,7 +25,6 @@ class SaferpayService
         string  $terminalId,
         bool    $useTestEnvironment,
         bool    $isStandalone,
-        ?string $returnUrl
     )
     {
         $this->_apiUsername = $apiUsername;
@@ -35,7 +33,6 @@ class SaferpayService
         $this->_terminalId = $terminalId;
         $this->_useTestEnvironment = $useTestEnvironment;
         $this->_isStandalone = $isStandalone;
-        $this->_returnUrl = $returnUrl;
     }
 
     /**
@@ -120,7 +117,6 @@ class SaferpayService
                 'BillingAddress' => $billingAddressArray
             ],
             'ReturnUrl' => [
-//                 'Url' => $this->_isStandalone ? UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]) : $this->_returnUrl,
                 'Url' => $this->_isStandalone ? UrlHelper::actionUrl('commerce/payments/complete-payment', ['commerceTransactionId' => $transaction->id, 'commerceTransactionHash' => $transaction->hash]) : $transaction->order->returnUrl,
             ],
             'Notification' => [

@@ -29,11 +29,6 @@ class SaferpayGateway extends BaseGateway
      */
     public string $integration = 'standalone';
 
-    /**
-     * only used for headless mode
-     */
-    private ?string $_returnUrl = null;
-
     private bool|string|null $_useTestEnvironment = null;
 
     private ?string $_apiUsername = null;
@@ -79,13 +74,9 @@ class SaferpayGateway extends BaseGateway
 
     public function purchase(Transaction $transaction, BasePaymentForm $form): RequestResponseInterface
     {
-        // TODO use correct URL
         $webhookUrl = $this->getWebhookUrl([
-            'commerceTransactionId' => $transaction->id,
             'commerceTransactionHash' => $transaction->hash,
         ]);
-
-        $webhookUrl = "https://e902-85-195-237-242.ngrok-free.app/index.php?p=actions/commerce/webhooks/process-webhook&gateway=2&commerceTransactionHash={$transaction->hash}";
 
         try {
             $data = $this->getSaferpayService()->paymentPageInitialize($transaction, $webhookUrl);
@@ -101,13 +92,7 @@ class SaferpayGateway extends BaseGateway
      */
     public function completePurchase(Transaction $transaction, ?bool $isWebhook = false): RequestResponseInterface
     {
-        // TODO SIMULATE ASYNC
-//        if (!$isWebhook) {
-//            return new CheckoutResponse($transaction->reference, 200, [], TransactionRecord::STATUS_PROCESSING);
-//        }
-
         // TODO if canceled on payment page, and coming back, the webhook might already created a failed child transaction, so it creates two failed transactions
-
         try {
             $assert = $this->getSaferpayService()->paymentPageAssert($transaction->reference);
             $transactionStatus = $assert['Transaction']['Status']; //  'AUTHORIZED', 'CANCELED', 'CAPTURED' or 'PENDING'
@@ -268,7 +253,6 @@ class SaferpayGateway extends BaseGateway
     {
         $settings = parent::getSettings();
         $settings['integration'] = $this->integration;
-        $settings['returnUrl'] = $this->getReturnUrl(false);
         $settings['useTestEnvironment'] = $this->getUseTestEnvironment(false);
         $settings['apiUsername'] = $this->getApiUsername(false);
         $settings['apiPassword'] = $this->getApiPassword(false);
@@ -276,11 +260,6 @@ class SaferpayGateway extends BaseGateway
         $settings['terminalId'] = $this->getTerminalId(false);
 
         return $settings;
-    }
-
-    public function getReturnUrl(bool $parse = true): ?string
-    {
-        return $parse ? App::parseEnv($this->_returnUrl) : $this->_returnUrl;
     }
 
     public function getUseTestEnvironment(bool $parse = true): bool|string|null
@@ -306,11 +285,6 @@ class SaferpayGateway extends BaseGateway
     public function getTerminalId(bool $parse = true): ?string
     {
         return $parse ? App::parseEnv($this->_terminalId) : $this->_terminalId;
-    }
-
-    public function setReturnUrl(?string $returnUrl): void
-    {
-        $this->_returnUrl = $returnUrl;
     }
 
     public function setUseTestEnvironment(string|bool|null $useTestEnvironment): void
@@ -348,7 +322,6 @@ class SaferpayGateway extends BaseGateway
                 $this->getTerminalId(),
                 $this->getUseTestEnvironment(),
                 $this->integration === 'standalone',
-                $this->getReturnUrl()
             );
         }
 
